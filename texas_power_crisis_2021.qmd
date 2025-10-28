@@ -19,7 +19,7 @@ library(sf)
 
 
 ```{r}
-
+# change to read stars?
 # create raster objects
 houston1 <- rast("data/VNP46A1/VNP46A1.A2021038.h08v05.001.2021039064328.tif")
 houston2 <- rast("data/VNP46A1/VNP46A1.A2021038.h08v06.001.2021039064329.tif")
@@ -41,7 +41,7 @@ if(st_crs(houston1) == st_crs(socioeconomic)){
   print("crs does not a match")
 }
 
-socioeconomic <- st_transform(socioeconomic, crs = st_crs(houston1))
+# socioeconomic <- st_transform(socioeconomic, crs = st_crs(houston1))
 ```
 
 ```{r}
@@ -56,29 +56,29 @@ difference <- (day_2 - day_1)
 ```
 
 ```{r}
-tm_shape(day_1) + 
-  tm_raster(col.legend = tm_legend("Power?")) + 
+# tm_shape(day_1) + 
+#   tm_raster(col.legend = tm_legend("Power?")) + 
   
 ```
 
 ```{r}
 
-# Define a reclassification matrix
-rcl <- matrix(c(-Inf, 200, 0, # values -Inf to 199 = 0
-                200, Inf, 1),  # values 200 to Inf = 1
-              ncol = 3, byrow = TRUE)
-
-# Apply the matrix to reclassify the raster, making all cells 0 or 1 or 2
-day1_rcl <- terra::classify(day_1, rcl = rcl)
-
-# # Assign labels to the numerical categories
-# levels(dem_rcl) <- tibble::tibble(id = 0:2, 
-#                                   cats = c("low", "medium", "high"))
-
- values(day1_rcl) <- as.factor(values(day1_rcl))
-
-tm_shape(day1_rcl) +
-  tm_raster()
+# # Define a reclassification matrix
+# rcl <- matrix(c(-Inf, 200, 0, # values -Inf to 199 = 0
+#                 200, Inf, 1),  # values 200 to Inf = 1
+#               ncol = 3, byrow = TRUE)
+# 
+# # Apply the matrix to reclassify the raster, making all cells 0 or 1 or 2
+# day1_rcl <- terra::classify(day_1, rcl = rcl)
+# 
+# # # Assign labels to the numerical categories
+# # levels(dem_rcl) <- tibble::tibble(id = 0:2, 
+# #                                   cats = c("low", "medium", "high"))
+# 
+#  values(day1_rcl) <- as.factor(values(day1_rcl))
+# 
+# tm_shape(day1_rcl) +
+#   tm_raster()
 
 ```
 
@@ -97,7 +97,7 @@ difference_rcl <- terra::classify(difference, rcl = rcl)
 # levels(dem_rcl) <- tibble::tibble(id = 0:2, 
 #                                   cats = c("low", "medium", "high"))
 
- values(difference_rcl) <- as.factor(values(difference_rcl))
+values(difference_rcl) <- as.factor(values(difference_rcl))
 
 tm_shape(difference_rcl) +
   tm_raster()
@@ -125,9 +125,37 @@ tm_shape(masked) +
 vectorize the blackout mask
 hint: use st_as_sf() to convert from a raster to a vector and fix any invalid geometries with st_make_valid()
 ```{r}
+masked_sf <- as.polygons(masked) %>% 
+  st_as_sf() %>% 
+  st_make_valid
+```
 
-masked_sf <- st_as_sf(masked) %>% 
-  st_make_valid()
+crop (spatially subset) the blackout mask to the Houston area as defined by the following coordinates:
+(-96.5, 29), (-96.5, 30.5), (-94.5, 30.5), (-94.5, 29)
+```{r}
+# check what the crs of masked_sf is 
+st_crs(masked_sf)
 
+houston_bbox <- st_bbox(c(xmin = -94.5, ymin = -29, xmax = -96.5, ymax = 30.5),
+        crs = st_crs(4326))
+
+houston_sf <- st_crop(masked_sf, houston_bbox)
+
+ tm_shape(houston_sf) +
+  tm_polygons() +
+  tm_title(text = "Vectorized raster")
+ 
+```
+
+re-project the cropped blackout dataset to EPSG:3083 (NAD83 / Texas Centric Albers Equal Area)
+```{r}
+
+houston_transformed <- st_transform(houston_sf, crs = st_crs(3083))
+
+```
+
+```{r}
+tm_shape(houston_transformed) +
+  tm_polygons()
 ```
 
