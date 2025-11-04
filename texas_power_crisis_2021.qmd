@@ -3,159 +3,221 @@ title: "Texas Power Crisis, February 2021"
 author: "Jaslyn Miura"
 format: html
 date: October 24, 2025
+editor_options: 
+  chunk_output_type: console
+warning: false
+message: false
 ---
 
-```{r}
-library(terra) # raster handling
+```{r, echo=FALSE}
+# load in necessary packages
+library(terra)
 library(tidyverse)
-library(tmap) # map making
-library(kableExtra) # table formatting
-library(spData) # spatial data
-library(spDataLarge) # spatial data
-library(geodata) # spatial data
+library(tmap) 
+library(kableExtra) 
 library(stars)
 library(sf)
 ```
 
-
+### Load in data and data cleaning
 ```{r}
-# change to read stars?
-# create raster objects
-houston1 <- rast("data/VNP46A1/VNP46A1.A2021038.h08v05.001.2021039064328.tif")
-houston2 <- rast("data/VNP46A1/VNP46A1.A2021038.h08v06.001.2021039064329.tif")
-houston3 <- rast("data/VNP46A1/VNP46A1.A2021047.h08v05.001.2021048091106.tif")
-houston4 <- rast("data/VNP46A1/VNP46A1.A2021047.h08v06.001.2021048091105.tif")
+# read in VIIRS night light data
+lights1_07 <- read_stars("data/VNP46A1/VNP46A1.A2021038.h08v05.001.2021039064328.tif")
+lights2_07 <- read_stars("data/VNP46A1/VNP46A1.A2021038.h08v06.001.2021039064329.tif")
+lights1_16 <- read_stars("data/VNP46A1/VNP46A1.A2021047.h08v05.001.2021048091106.tif")
+lights2_16 <- read_stars("data/VNP46A1/VNP46A1.A2021047.h08v06.001.2021048091105.tif")
 
-roads <- st_read("data/gis_osm_roads_free_1.gpkg")
-houses <- st_read("data/gis_osm_buildings_a_free_1.gpkg")
-socioeconomic <- st_read("data/ACS_2019_5YR_TRACT_48_TEXAS.gdb")
+# read in OSM roads data
+roads <- st_read("data/gis_osm_roads_free_1.gpkg", 
+                 query = "SELECT * FROM gis_osm_roads_free_1 WHERE fclass='motorway'")
+
+# read in OSM houses data
+houses <- st_read("data/gis_osm_buildings_a_free_1.gpkg", query = "SELECT *
+FROM gis_osm_buildings_a_free_1
+WHERE (type IS NULL AND name IS NULL)
+OR type in ('residential', 'apartments', 'house', 'static_caravan', 'detached')")
+
+# read in ACS socioeconomic data
+ACS_geometry <- st_read("data/ACS_2019_5YR_TRACT_48_TEXAS.gdb", layer = 'ACS_2019_5YR_TRACT_48_TEXAS') 
+ACS_attributes <- st_read("data/ACS_2019_5YR_TRACT_48_TEXAS.gdb", layer = "X19_INCOME") 
+
+# joining the ACS geometry and attribute data
+ACS_join <- left_join(ACS_attributes, ACS_geometry, by = c("GEOID" = "GEOID_Data"))
 
 ```
 
-# Checking the CRS of the rasters
+```{r}
+# plot(ACS_joined)
+```
 
 ```{r}
-if(st_crs(houston1) == st_crs(socioeconomic)){
-  print("it's a match!")
-} else {
-  print("crs does not a match")
-}
+
+# Get information about the layers in 'my_spatial_data.gpkg'
+layer_info <- st_layers(dsn = "data/ACS_2019_5YR_TRACT_48_TEXAS.gdb")
+
+# Print the layer information
+print(layer_info)
+```
+# Checking the CRS of the rasters
+```{r}
+# if(st_crs(houston1) == st_crs(socioeconomic)){
+#   print("it's a match!")
+# } else {
+#   print("crs does not a match")
+# }
 
 # socioeconomic <- st_transform(socioeconomic, crs = st_crs(houston1))
 ```
 
 ```{r}
 
-day_1 <- merge(houston1, houston2)
-day_2 <- merge(houston3, houston4)
+# joining the night light rasters of the same day.
+lights_07 <- st_mosaic(lights1_07, lights2_07)
+lights_16 <- st_mosaic(lights1_16, lights2_16)
 
-# find the change in night lights intensity (presumably) caused by the storm
-# hint: this will require creating a raster object for each day (2021-02-07 and 2021-02-16)
-difference <- (day_2 - day_1)
+# creating a raster of the change in night light intensity.
+blackout <- (lights_07 - lights_16)
 
 ```
 
 ```{r}
-# tm_shape(day_1) + 
-#   tm_raster(col.legend = tm_legend("Power?")) + 
-  
-```
 
-```{r}
+# Creating a bbox of the area of study, Houston.
+houston_bbox <- st_bbox(c(xmin = -94.5, ymin = 29, xmax = -96.5, ymax = 30.5), 
+                        crs = st_crs(4326))
 
-# # Define a reclassification matrix
-# rcl <- matrix(c(-Inf, 200, 0, # values -Inf to 199 = 0
-#                 200, Inf, 1),  # values 200 to Inf = 1
-#               ncol = 3, byrow = TRUE)
-# 
-# # Apply the matrix to reclassify the raster, making all cells 0 or 1 or 2
-# day1_rcl <- terra::classify(day_1, rcl = rcl)
-# 
-# # # Assign labels to the numerical categories
-# # levels(dem_rcl) <- tibble::tibble(id = 0:2, 
-# #                                   cats = c("low", "medium", "high"))
-# 
-#  values(day1_rcl) <- as.factor(values(day1_rcl))
-# 
-# tm_shape(day1_rcl) +
-#   tm_raster()
+# Checking that the crs of the blackout raster and the crs of the bbox match.
+if(st_crs(blackout) == st_crs(houston_bbox)){
+  print("it's a match!")
+} else {
+  print("crs does not match")
+}
+
+# Using the houston_bbox to crop the blackout raster to the area of study.
+houston_cropped <- st_crop(blackout, houston_bbox)
 
 ```
 
-reclassify the difference raster, assuming that any location that experienced a drop of more than 200 nW cm-2sr-1 experienced a blackout
+
 ```{r}
 
-# Define a reclassification matrix
-rcl <- matrix(c(-Inf, 200, 0, # values -Inf to 199 = 0
-                200, Inf, 1),  # values 200 to Inf = 1
-              ncol = 3, byrow = TRUE)
+# Create raster mask of the same resolution and extent
+blackout_mask <- houston_cropped
 
-# Apply the matrix to reclassify the raster, making all cells 0 or 1 or 2
-difference_rcl <- terra::classify(difference, rcl = rcl)
+# Setting the values in the mask raster that are less than 200 to be NA values
+blackout_mask[blackout_mask < 200] <- NA
 
-# # Assign labels to the numerical categories
-# levels(dem_rcl) <- tibble::tibble(id = 0:2, 
-#                                   cats = c("low", "medium", "high"))
-
-values(difference_rcl) <- as.factor(values(difference_rcl))
-
-tm_shape(difference_rcl) +
-  tm_raster()
-
-
-```
-
-assign NA to all locations that experienced a drop of less than 200 nW cm-2sr-1 change
-```{r}
-
-# create raster mask of the same resolution and extent
-rmask <- difference
-
-# set all cells with  less than 200 to NA
-rmask[rmask < 200] <- NA
-
-# approach 2: mask() function
-masked <- mask(difference, rmask) 
-
-tm_shape(masked) +
-  tm_raster()
-
-```
-
-vectorize the blackout mask
-hint: use st_as_sf() to convert from a raster to a vector and fix any invalid geometries with st_make_valid()
-```{r}
-masked_sf <- as.polygons(masked) %>% 
+# Vectorizing the masked raster
+masked_sf <- blackout_mask %>% 
   st_as_sf() %>% 
-  st_make_valid
-```
+  st_make_valid()
 
-crop (spatially subset) the blackout mask to the Houston area as defined by the following coordinates:
-(-96.5, 29), (-96.5, 30.5), (-94.5, 30.5), (-94.5, 29)
-```{r}
-# check what the crs of masked_sf is 
-st_crs(masked_sf)
+# Mapping the raster to see if it works
+tm_shape(masked_sf) +
+  tm_polygons()
 
-houston_bbox <- st_bbox(c(xmin = -94.5, ymin = -29, xmax = -96.5, ymax = 30.5),
-        crs = st_crs(4326))
-
-houston_sf <- st_crop(masked_sf, houston_bbox)
-
- tm_shape(houston_sf) +
-  tm_polygons() +
-  tm_title(text = "Vectorized raster")
- 
-```
-
-re-project the cropped blackout dataset to EPSG:3083 (NAD83 / Texas Centric Albers Equal Area)
-```{r}
-
-houston_transformed <- st_transform(houston_sf, crs = st_crs(3083))
+### THIS WORKS!!!!
 
 ```
 
 ```{r}
+
+# Setting the crs of of the mask vector.
+houston_transformed <- st_transform(masked_sf, crs = st_crs(3083))
+
 tm_shape(houston_transformed) +
   tm_polygons()
+
+```
+
+```{r}
+
+# Checking that the crs of the roads and the crs of the houston_transformed vector match.
+if(st_crs(roads) == st_crs(houston_transformed)){
+  print("it's a match!")
+} else {
+  print("crs does not match")
+}
+
+# Setting the crs of roads to match the crs of houston_transformed.
+roads <- st_transform(roads, crs = st_crs(houston_transformed))
+
+# Using houston_transfomed to crop the roads.
+roads_cropped <- st_crop(roads, houston_transformed)
+
+tm_shape(houston_transformed) +
+  tm_polygons() +
+  tm_shape(roads_cropped) +
+  tm_lines() +
+  tm_title(text = "Blackout Transformed vector")
+
+```
+
+```{r}
+
+# Creating a 200m buffer around all highways.
+highways_buff_200m <- st_buffer(roads_cropped, dist = 200)
+
+tm_shape(houston_transformed) +
+  tm_polygons() +
+  tm_shape(highways_buff_200m) +
+  tm_polygons()
+
+# Combining the buffer geometries and creating one buffer shape.
+highways_buff_union <- st_union(highways_buff_200m) %>% 
+  st_as_sf()
+
+tm_shape(highways_buff_union) +
+  tm_polygons() 
+
+```
+
+```{r}
+
+# Filtering under the st_disjoint predicate to find blackout areas outside of the buffer 
+outside_roads <- houston_transformed %>%
+  st_filter(y = highways_buff_union, .predicate = st_disjoint) 
+
+tm_shape(outside_roads) +
+  tm_polygons() 
+
+
+# everything above works!!!!
+```
+
+# houses likely impacted by blackout
+```{r}
+
+# Checking that the crs of the housed and the crs of the outside_roads vector match.
+if(st_crs(houses) == st_crs(outside_roads)){
+  print("it's a match!")
+} else {
+  print("crs does not a match")
+}
+
+# Setting the crs of houses to match the crs of outside_roads.
+houses <- st_transform(houses, crs = st_crs(outside_roads))
+
+# Filtering under the st_intersects predicate to find the houses in the blackout region.
+outside_roads_houses <- outside_roads %>%
+  st_filter(y = houses, .predicate = st_intersects)
+
+tm_shape(outside_roads_houses) +
+  tm_polygons()
+
+```
+
+
+```{r}
+# socioeconomic
+# need to change the name of "GEOID" to "GEOID_old" so that the data can join on "GEOID_Data"
+
+
+ACS_join <- ACS_join %>% 
+  select("B19013e1", "B19013m1", "GEOID", "Shape") # HOW DO I MAKE THIS AN SPATIAL OBJECT TO PLOT
+  
+# census_outside_roads <- st_join(ACS_join, outside_roads_houses)
+
+
 ```
 
