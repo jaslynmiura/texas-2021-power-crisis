@@ -42,12 +42,8 @@ ACS_geometry <- st_read("data/ACS_2019_5YR_TRACT_48_TEXAS.gdb", layer = 'ACS_201
 ACS_attributes <- st_read("data/ACS_2019_5YR_TRACT_48_TEXAS.gdb", layer = "X19_INCOME") 
 
 # joining the ACS geometry and attribute data
-ACS_join <- left_join(ACS_attributes, ACS_geometry, by = c("GEOID" = "GEOID_Data"))
+ACS_join <- left_join(ACS_geometry, ACS_attributes, by = c("GEOID_Data" = "GEOID"))
 
-```
-
-```{r}
-# plot(ACS_joined)
 ```
 
 ```{r}
@@ -57,16 +53,6 @@ layer_info <- st_layers(dsn = "data/ACS_2019_5YR_TRACT_48_TEXAS.gdb")
 
 # Print the layer information
 print(layer_info)
-```
-# Checking the CRS of the rasters
-```{r}
-# if(st_crs(houston1) == st_crs(socioeconomic)){
-#   print("it's a match!")
-# } else {
-#   print("crs does not a match")
-# }
-
-# socioeconomic <- st_transform(socioeconomic, crs = st_crs(houston1))
 ```
 
 ```{r}
@@ -199,8 +185,8 @@ if(st_crs(houses) == st_crs(outside_roads)){
 houses <- st_transform(houses, crs = st_crs(outside_roads))
 
 # Filtering under the st_intersects predicate to find the houses in the blackout region.
-outside_roads_houses <- outside_roads %>%
-  st_filter(y = houses, .predicate = st_intersects)
+outside_roads_houses <- houses %>%
+  st_filter(y = outside_roads, .predicate = st_intersects)
 
 tm_shape(outside_roads_houses) +
   tm_polygons()
@@ -209,15 +195,56 @@ tm_shape(outside_roads_houses) +
 
 
 ```{r}
-# socioeconomic
-# need to change the name of "GEOID" to "GEOID_old" so that the data can join on "GEOID_Data"
-
-
+# NEED TO ADD THIS TO THE DATA CLEANING PART ABOVE.
 ACS_join <- ACS_join %>% 
-  select("B19013e1", "B19013m1", "GEOID", "Shape") # HOW DO I MAKE THIS AN SPATIAL OBJECT TO PLOT
-  
-# census_outside_roads <- st_join(ACS_join, outside_roads_houses)
+  select("B19013e1", "B19013m1", "GEOID", "Shape") 
 
+
+# Checking that the crs of the housed and the crs of the outside_roads vector match.
+if(st_crs(ACS_join) == st_crs(outside_roads_houses)){
+  print("it's a match!")
+} else {
+  print("crs does not a match")
+}
+
+ACS_join <- st_transform(ACS_join, crs = st_crs(outside_roads_houses))
+
+# Using houston_transfomed to crop the ACS_join
+ACS_crop <- st_crop(ACS_join, outside_roads_houses)
+
+# Census blocks that have experienced the blackout
+outside_roads_houses <- ACS_crop %>%
+  st_filter(y = outside_roads_houses, .predicate = st_intersects)
+
+tm_shape(ACS_crop) +
+  tm_polygons() +
+tm_shape(outside_roads_houses) +
+  tm_polygons(fill = "hotpink") +
+  tm_title(text = "Census blocks that experienced blackout")
+
+```
+
+```{r}
+
+census_no_blackout <- ACS_crop %>%
+  st_filter(y = outside_roads_houses, .predicate = st_intersects, .reverse = TRUE)
+
+# outside_roads_houses_union <- st_union(outside_roads_houses)
+# 
+# census_no_blackout <- ACS_crop %>%
+#   st_filter(y = outside_roads_houses, .predicate = st_difference)
+
+# outside_roads_houses <- ACS_crop %>%
+#   st_filter(y = census_no_blackout, .predicate = st_intersects)
+
+# --------
+
+
+
+tm_shape(ACS_crop) +
+  tm_polygons(fill = "dodgerblue") + 
+  tm_shape(census_no_blackout) +
+  tm_polygons(fill = "hotpink") 
 
 ```
 
