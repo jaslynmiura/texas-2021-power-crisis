@@ -67,9 +67,38 @@ blackout <- (lights_07 - lights_16)
 ```
 
 ```{r}
+# Creating a bbox of the area of study, Houston.
+houston_bbox <- st_bbox(c(xmin = -96.5, ymin = 29, xmax = -94.5, ymax = 30.5), 
+                        crs = st_crs(4326))
+
+# Checking that the crs of the blackout raster and the crs of the bbox match.
+if(st_crs(lights_07) == st_crs(houston_bbox)){
+  print("it's a match!")
+} else {
+  print("crs does not match")
+}
+
+# Using the houston_bbox to crop the blackout raster to the area of study.
+lights_07_houston <- st_crop(lights_07, houston_bbox)
+lights_16_houston <- st_crop(lights_16, houston_bbox)
+
+
+plot(lights_07_houston,
+     main = "VIIRS displaying light intensity on 02-07-2021",
+     axes = TRUE,
+     key.pos = NULL)
+plot(lights_16_houston,
+     main = "VIIRS displaying light intensity on 02-16-2021",
+     axes = TRUE)
+
+
+```
+
+
+```{r}
 
 # Creating a bbox of the area of study, Houston.
-houston_bbox <- st_bbox(c(xmin = -94.5, ymin = 29, xmax = -96.5, ymax = 30.5), 
+houston_bbox <- st_bbox(c(xmin = -96.5, ymin = 29, xmax = -94.5, ymax = 30.5), 
                         crs = st_crs(4326))
 
 # Checking that the crs of the blackout raster and the crs of the bbox match.
@@ -188,8 +217,10 @@ houses <- st_transform(houses, crs = st_crs(outside_roads))
 outside_roads_houses <- houses %>%
   st_filter(y = outside_roads, .predicate = st_intersects)
 
-tm_shape(outside_roads_houses) +
-  tm_polygons()
+# ADD A BASE MAP OF HOUSTON
+tm_shape(outside_roads_houses, bbox = houston_bbox) +
+  tm_polygons()  + 
+  tm_title(text = "Houses")
 
 ```
 
@@ -226,8 +257,8 @@ tm_shape(outside_roads_houses) +
 
 ```{r}
 
-census_no_blackout <- ACS_crop %>%
-  st_filter(y = outside_roads_houses, .predicate = st_intersects, .reverse = TRUE)
+# census_no_blackout <- ACS_crop %>%
+#   st_filter(y = outside_roads_houses, .predicate = st_intersects, .reverse = TRUE)
 
 # outside_roads_houses_union <- st_union(outside_roads_houses)
 # 
@@ -239,12 +270,18 @@ census_no_blackout <- ACS_crop %>%
 
 # --------
 
-
+census_no_blackout_clip <- st_difference(outside_roads_houses, ACS_crop)
 
 tm_shape(ACS_crop) +
   tm_polygons(fill = "dodgerblue") + 
   tm_shape(census_no_blackout) +
   tm_polygons(fill = "hotpink") 
 
+tm_shape(census_no_blackout_clip) +
+  tm_polygons() +
+  tm_shape(outside_roads_houses) +
+  tm_polygons(fill = "hotpink")
+
 ```
+
 
