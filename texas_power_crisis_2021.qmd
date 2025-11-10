@@ -82,7 +82,7 @@ if(st_crs(lights_07) == st_crs(houston_bbox)){
 lights_07_houston <- st_crop(lights_07, houston_bbox)
 lights_16_houston <- st_crop(lights_16, houston_bbox)
 
-
+# plotting
 plot(lights_07_houston,
      main = "VIIRS displaying light intensity on 02-07-2021",
      axes = TRUE,
