@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Ignoring the data folder
+data/
+
+# Ignoring the images folder
+images/
+
+# Ignoring the html
+texas_power_crisis_2021.html
