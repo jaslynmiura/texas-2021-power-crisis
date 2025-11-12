@@ -1,11 +1,10 @@
-# The Power Crisis of February 2021, Houston, Texas
-
+# The Power Crisis of February 2021 in Houston, Texas
 
 This is a GitHub repository for Jaslyn Miura's analysis of an analysis of the 2021 power crisis after severe winter storms, in Houston, Texas; using NASA's VIIRS, OpenStreetMap, and American Community Survey data.
 
 By analyzing the number of homes and census tracts that experienced an electricity blackout during the winter storms in Houston, Texas, helps us understand if the impacts were disproportionately felt.
 
-##**File Directory:**
+**File Directory:**
 
 ```
 texas-2021-power-crisis
